@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const app = express()
 const { connect } = require('./database/ConnectSQL')
+const {CreateTables} = require('./service/CreateTables')
 const createrouter = require('./controller/PatientController')
 
 const port = 5000
@@ -21,4 +22,6 @@ app.listen(port, () => {
 })
 
 connect()
+CreateTables()
+
 

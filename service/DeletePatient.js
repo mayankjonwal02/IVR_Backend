@@ -1,69 +1,64 @@
 const { connection } = require('../database/ConnectSQL');
 
-const DeletePatient = (req, res) => {
-    const { engagementid } = req.body;
+const MovePatientToPastPatients = (req, res) => {
+    const { engagementid, departmentname } = req.body;
 
-    if (!engagementid) {
-        return res.status(400).json({ error: 'engagementid is required' });
-    }
-
-    // Step 1: Retrieve the record to be deleted
-    const selectSql = `
-        SELECT engagementid, patientid, patientname, patientcno, operationtype, duedate
-        FROM patientdata
-        WHERE engagementid = ?
+    // SQL query to get patient data from departmentname table
+    const selectQuery = `
+        SELECT engagementid, patientid, patientname, patientcno, operationtype, language, department, calledon,numberOfInteractions, duedate 
+        FROM current_records 
+        WHERE engagementid = ?;
     `;
 
-    connection.query(selectSql, [engagementid], (selectErr, results) => {
-        if (selectErr) {
-            console.error('Error retrieving data:', selectErr);
-            return res.status(500).json({ error: 'Failed to retrieve data' });
-        }
+    // SQL query to insert patient data into pastpatients table
+    const insertQuery = `
+        INSERT INTO past_records (
+            engagementid, patientid, patientname, patientcno, operationtype, language, department, calledon, numberOfInteractions, duedate
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?, ?);
+    `;
 
-        if (results.length === 0) {
-            return res.status(404).json({ error: 'Record not found' });
-        }
+    // SQL query to delete patient from departmentname table
+    const deleteQuery = `
+        DELETE FROM current_records
+        WHERE engagementid = ?;
+    `;
 
-        const record = results[0];
+    
 
-        // Step 2: Insert the record into the pastpatients table
-        const insertSql = `
-            INSERT INTO pastpatients (
-                engagementid, patientid, patientname, patientcno, operationtype, duedate
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        `;
-
-        const insertValues = [
-            record.engagementid,
-            record.patientid,
-            record.patientname,
-            record.patientcno,
-            record.operationtype,
-            record.duedate
-        ];
-
-        connection.query(insertSql, insertValues, (insertErr) => {
-            if (insertErr) {
-                console.error('Error inserting data into pastpatients:', insertErr);
-                return res.status(500).json({ error: 'Failed to transfer data to pastpatients' });
+    try {
+        // Fetch the patient record
+        connection.query(selectQuery, [engagementid], (err, result) => {
+            if (err || result.length === 0) {
+                console.error('Error fetching patient data:', err);
+                return res.status(500).json({ message: 'Failed to fetch patient data', executed: false });
             }
 
-            // Step 3: Delete the record from the patientdata table
-            const deleteSql = `
-                DELETE FROM patientdata
-                WHERE engagementid = ?
-            `;
+            const patient = result[0];
 
-            connection.query(deleteSql, [engagementid], (deleteErr) => {
-                if (deleteErr) {
-                    console.error('Error deleting data:', deleteErr);
-                    return res.status(500).json({ error: 'Failed to delete data' });
+            // Move the patient data to pastpatients table
+            connection.query(insertQuery, [
+                patient.engagementid, patient.patientid, patient.patientname, patient.patientcno,
+                patient.operationtype, patient.language, patient.department, patient.calledon, patient.numberOfInteractions, patient.duedate
+            ], (insertErr) => {
+                if (insertErr) {
+                    console.error('Error inserting into pastpatients:', insertErr);
+                    return res.status(500).json({ message: 'Failed to move patient data', executed: false });
                 }
 
-                res.json({ message: 'Patient record deleted and transferred successfully' });
+                // Delete the patient from the departmentname table
+                connection.query(deleteQuery, [engagementid], (deleteErr) => {
+                    if (deleteErr) {
+                        console.error('Error deleting patient:', deleteErr);
+                        return res.status(500).json({ message: 'Failed to delete patient', executed: false });
+                    }
+
+                    res.json({ message: 'Patient moved to pastpatients and deleted successfully', executed: true });
+                });
             });
         });
-    });
-}
+    } catch (error) {
+        res.json({ message: String(error), executed: false });
+    }
+};
 
-module.exports = { DeletePatient };
+module.exports = { MovePatientToPastPatients };

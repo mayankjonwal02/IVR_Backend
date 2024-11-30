@@ -1,10 +1,11 @@
 const mysql = require('mysql2');
 
+
 const connection = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '',
-    database: 'hospitaldatabase'
+    database:'ivr_database'
 });
 
 
@@ -15,6 +16,7 @@ const connect = () => {
                 console.log("Error in connection with database", err);
             } else {
                 console.log("Connection established with database");
+                
             }
         })
     })
